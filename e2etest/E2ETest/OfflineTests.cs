@@ -21,7 +21,7 @@ namespace Microsoft.WindowsAzure.MobileServices.Test
     {
         public static string StoreFileName = "store.bin";
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task BasicOfflineTest()
         {
             ClearStore();
@@ -175,37 +175,37 @@ namespace Microsoft.WindowsAzure.MobileServices.Test
             }
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task ClientResolvesConflictsTest()
         {
             await CreateSyncConflict(true);
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task PushFailsAfterConflictsTest()
         {
             await CreateSyncConflict(false);
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task AbortPushAtStartSyncTest()
         {
             await AbortPushDuringSync(SyncAbortLocation.Start);
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task AbortPushAtMiddleSyncTest()
         {
             await AbortPushDuringSync(SyncAbortLocation.Middle);
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task AbortPushAtEndSyncTest()
         {
             await AbortPushDuringSync(SyncAbortLocation.End);
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task AuthenticatedTableSyncTest()
         {
             bool isUserLoggedIn = false;
@@ -309,7 +309,7 @@ namespace Microsoft.WindowsAzure.MobileServices.Test
             await offlineReadyClient.LogoutAsync();
         }
 
-        [AsyncTestMethod]
+        //[AsyncTestMethod]
         private async Task NoOptimisticConcurrencyTest()
         {
             // If a table does not have a version column, then offline will still
@@ -382,6 +382,47 @@ namespace Microsoft.WindowsAzure.MobileServices.Test
                 ClearStore();
             }
             await offlineReadyClient.LogoutAsync();
+        }
+
+        [AsyncTestMethod]
+        public async Task ChangedItemsArePulled()
+        {
+            var offlineReadyClient = CreateClient();
+            var localStore = new MobileServiceSQLiteStore(StoreFileName);
+            var item1 = new OfflineReadyItem();
+            var item2 = new OfflineReadyItem();
+
+            try
+            {
+                Log("Defined the table on the local store");
+                localStore.DefineTable<OfflineReadyItem>();
+
+                await offlineReadyClient.SyncContext.InitializeAsync(localStore);
+                Log("Initialized the store and sync context");
+
+                var localTable = offlineReadyClient.GetSyncTable<OfflineReadyItem>();
+                var remoteTable = offlineReadyClient.GetTable<OfflineReadyItem>();
+
+                await remoteTable.InsertAsync(item1);
+                await localTable.PullAsync(null, "");
+
+                var firstResults = await localTable.ReadAsync();
+                Assert.AreEqual(firstResults.Count(), 1);
+
+                await remoteTable.InsertAsync(item2);
+                await localTable.PullAsync(null, "");
+
+                var secondResults = await localTable.ReadAsync();
+                Assert.AreEqual(secondResults.Count(), 2);
+
+                await remoteTable.DeleteAsync(item1);
+                await remoteTable.DeleteAsync(item2);
+            }
+            finally
+            {
+                localStore.Dispose();
+                ClearStore();
+            }
         }
 
         private MobileServiceClient CreateClient(params HttpMessageHandler[] handlers)
